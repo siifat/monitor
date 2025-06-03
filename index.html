@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bangladesh Budget Monitor Guide (৳8k-15k)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Chosen Palette: Calm Harmony -->
+    <!-- Application Structure Plan: The SPA is designed as a task-oriented interactive dashboard. The primary goal is to help users compare and select a monitor. The structure includes: 1) A control panel with a primary "Priority" selector (Best Overall, Eye Comfort, Value) and secondary filters (Price, Brand). This immediately focuses the user on their goal. 2) A dynamic content area with three levels of detail: Top Recommendation Cards (quick summary), an Interactive Comparison Chart (visual analysis), and a Detailed Data Table (granular data). 3) A "Brand Deep Dive" section where clicking a brand reveals detailed qualitative analysis from the report. This structure was chosen because it directly maps to the user's decision-making process—from broad priorities to specific details—making it more intuitive and effective than a linear report. -->
+    <!-- Visualization & Content Choices: 1) Report Info: Key monitor specs (price, refresh rate, panel type, etc.). Goal: Compare. Viz: A dynamic horizontal bar chart (Chart.js) to compare models on a selected metric. Interaction: Chart updates based on filters. Hovering shows tooltips. Justification: Bar charts are excellent for comparing discrete items on a quantitative scale. 2) Report Info: Qualitative brand analysis. Goal: Inform/Organize. Method: Click-to-reveal content cards for each brand. Interaction: Clicking a brand in the table shows its detailed review. Justification: This "progressive disclosure" prevents information overload and keeps the main interface clean, allowing users to drill down on demand. -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #F8F7F4; color: #3D3D3D; }
+        .priority-btn { transition: all 0.3s ease; }
+        .priority-btn.active { background-color: #5F7996; color: white; }
+        .brand-card { transition: opacity 0.5s ease, transform 0.5s ease; }
+        .brand-details { max-height: 0; overflow: hidden; transition: max-height 0.7s ease-in-out; }
+        .brand-details.open { max-height: 1500px; }
+        .chart-container { position: relative; width: 100%; max-width: 900px; margin-left: auto; margin-right: auto; height: 400px; max-height: 60vh; }
+        @media (min-width: 768px) { .chart-container { height: 500px; } }
+        .table-responsive { display: block; width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    </style>
+</head>
+<body class="antialiased">
+
+    <div class="container mx-auto p-4 md:p-8">
+
+        <header class="text-center mb-8">
+            <h1 class="text-3xl md:text-4xl font-bold text-[#3D3D3D] mb-2">Budget Monitor Guide for Bangladesh</h1>
+            <p class="text-lg text-gray-600">Interactively find the best monitor from ৳8,000 to ৳15,000 for your needs.</p>
+        </header>
+
+        <main id="app" class="space-y-12">
+            
+            <section id="controls" class="bg-white p-6 rounded-2xl shadow-sm">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
+                    <div>
+                        <h3 class="font-semibold text-lg mb-3">1. What's your main priority?</h3>
+                        <div id="priority-selector" class="flex flex-wrap gap-2">
+                            <button data-priority="overall" class="priority-btn active px-4 py-2 rounded-lg bg-gray-200 text-gray-800 font-medium">🏆 Best Overall</button>
+                            <button data-priority="eyecare" class="priority-btn px-4 py-2 rounded-lg bg-gray-200 text-gray-800 font-medium">👓 Eye Comfort</button>
+                            <button data-priority="value" class="priority-btn px-4 py-2 rounded-lg bg-gray-200 text-gray-800 font-medium">⚡ Best Value</button>
+                            <button data-priority="gaming" class="priority-btn px-4 py-2 rounded-lg bg-gray-200 text-gray-800 font-medium">🕹️ Gaming Feel</button>
+                        </div>
+                    </div>
+                    <div>
+                        <h3 class="font-semibold text-lg mb-3">2. Adjust your budget (Taka)</h3>
+                        <div class="flex items-center gap-4">
+                            <span class="font-mono">৳8,000</span>
+                            <input id="price-slider" type="range" min="8000" max="15000" value="15000" step="500" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                            <span class="font-mono font-semibold text-lg">৳<span id="price-value">15,000</span></span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-6">
+                    <h3 class="font-semibold text-lg mb-3">3. Select Brands to Compare</h3>
+                    <div id="brand-filter" class="flex flex-wrap gap-x-4 gap-y-2">
+                    </div>
+                </div>
+            </section>
+            
+            <section id="recommendations">
+                <h2 class="text-2xl font-bold mb-4">Top Recommendations for You</h2>
+                <div id="recommendations-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                </div>
+            </section>
+
+            <section id="comparison-chart">
+                <h2 class="text-2xl font-bold mb-1">Visual Comparison</h2>
+                <div class="flex flex-wrap gap-4 items-center mb-4">
+                     <p class="text-gray-600">Compare models based on a key metric.</p>
+                    <select id="chart-metric-selector" class="bg-white border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2">
+                        <option value="price" selected>Price (Low to High)</option>
+                        <option value="refreshRate">Refresh Rate</option>
+                        <option value="srgb">sRGB Coverage</option>
+                        <option value="contrast">Contrast Ratio</option>
+                    </select>
+                </div>
+                <div class="bg-white p-4 sm:p-6 rounded-2xl shadow-sm">
+                    <div class="chart-container">
+                        <canvas id="monitorsChart"></canvas>
+                    </div>
+                </div>
+            </section>
+            
+            <section id="details">
+                 <h2 class="text-2xl font-bold mb-4">Detailed Comparison</h2>
+                 <p class="text-gray-600 mb-4">Click a brand name to see our detailed analysis. Sort columns by clicking the headers.</p>
+                 <div class="bg-white rounded-2xl shadow-sm overflow-hidden">
+                    <div class="table-responsive">
+                        <table class="w-full text-sm text-left text-gray-600">
+                            <thead class="text-xs text-gray-700 uppercase bg-gray-100">
+                                <tr>
+                                    <th scope="col" class="px-6 py-3 cursor-pointer" data-sort="brand">Brand</th>
+                                    <th scope="col" class="px-6 py-3 cursor-pointer" data-sort="model">Model</th>
+                                    <th scope="col" class="px-6 py-3 cursor-pointer" data-sort="price">Price (৳)</th>
+                                    <th scope="col" class="px-6 py-3 cursor-pointer" data-sort="size">Size</th>
+                                    <th scope="col" class="px-6 py-3 cursor-pointer" data-sort="panel">Panel</th>
+                                    <th scope="col" class="px-6 py-3 cursor-pointer" data-sort="refreshRate">Hz</th>
+                                    <th scope="col" class="px-6 py-3 cursor-pointer" data-sort="srgb">sRGB (%)</th>
+                                    <th scope="col" class="px-6 py-3 cursor-pointer" data-sort="score">Score</th>
+                                </tr>
+                            </thead>
+                            <tbody id="monitors-table-body">
+                            </tbody>
+                        </table>
+                    </div>
+                 </div>
+            </section>
+
+            <section id="brand-details-section">
+                
+            </section>
+
+            <section id="buyers-guide" class="bg-white p-6 rounded-2xl shadow-sm">
+                <h2 class="text-2xl font-bold mb-4">Final Considerations for Buyers</h2>
+                 <div class="prose max-w-none text-gray-700 space-y-4">
+                    <p>When making your final decision, remember these key points to ensure you get the best value and ownership experience in Bangladesh.</p>
+                    <div>
+                        <h4 class="font-semibold">Retailer Choice and Authenticity</h4>
+                        <p>Always purchase from authorized dealers or major reputable stores like Ryans Computers, TechLand BD, or Star Tech. This guarantees a genuine product and ensures your 3-year manufacturer warranty will be honored locally, avoiding issues with grey market imports.</p>
+                    </div>
+                    <div>
+                        <h4 class="font-semibold">Verify Warranty Terms</h4>
+                        <p>Confirm the 3-year warranty details at purchase. Ask about what's covered (panel, backlight, etc.) and the claim process. Be aware that some retailers require the original box for warranty claims, so it's wise to keep it.</p>
+                    </div>
+                    <div>
+                        <h4 class="font-semibold">Local After-Sales Support</h4>
+                        <p>A good warranty is only useful if the service is accessible. Inquire about the location of authorized service centers for your chosen brand. Brands with dedicated local hotlines or strong distributor service partners (like LG, ViewSonic via UCC, or Dahua) can offer more peace of mind.</p>
+                    </div>
+                    <div>
+                        <h4 class="font-semibold">Have Realistic Expectations</h4>
+                        <p>Monitors in this budget offer excellent value for everyday work, study, and entertainment. They provide a comfortable, clear visual experience. However, they won't match the specialized performance of professional-grade or high-end gaming monitors. Focus on finding a reliable workhorse that fits your primary use case.</p>
+                    </div>
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const monitors = [
+                { brand: "LG", model: "22MP400-B", price: 10250, size: 22, panel: "VA", refreshRate: 75, srgb: 99, eyecare: 2, build: 3, value: 7, gaming: 2, overall: 7, desc: "Good for users prioritizing contrast, with reliable overall performance and a strong warranty.", analysis: "LG is a highly reputable brand with a substantial footprint in Bangladesh. Their monitors are well-regarded and widely available. LG's consumer electronics generally have a reputation for decent build quality. The 3-year warranty, which includes on-site service elements, is a significant advantage for longevity. Their IPS and VA panels provide a pleasant visual experience for everyday use." },
+                { brand: "LG", model: "22MK430H-B", price: 12600, size: 21.5, panel: "IPS", refreshRate: 75, srgb: 99, eyecare: 2, build: 3, value: 6, gaming: 2, overall: 8, desc: "A solid IPS option for good color and viewing angles, backed by an excellent service policy.", analysis: "LG is a highly reputable brand with a substantial footprint in Bangladesh. Their monitors are well-regarded and widely available. LG's consumer electronics generally have a reputation for decent build quality. The 3-year warranty, which includes on-site service elements, is a significant advantage for longevity. Their IPS and VA panels provide a pleasant visual experience for everyday use." },
+                { brand: "Samsung", model: "LS22C310EAW", price: 12900, size: 22, panel: "IPS", refreshRate: 75, srgb: 99, eyecare: 3, build: 3, value: 7, gaming: 2, overall: 8, desc: "A solid IPS choice with good color and eye-care features from a top-tier brand.", analysis: "Samsung holds a dominant position in the display market. Their monitors are known for technological innovation and enjoy high consumer trust. Budget IPS models offer good value with better color and viewing angles than their TN counterparts. The standard 3-year warranty is backed by an established, official service network in Bangladesh." },
+                { brand: "Samsung", model: "LS22D300GAW", price: 11750, size: 22, panel: "IPS", refreshRate: 100, srgb: 99, eyecare: 3, build: 3, value: 8, gaming: 6, overall: 9, desc: "Offers a high 100Hz refresh rate for smoother visuals at a competitive price.", analysis: "Samsung holds a dominant position in the display market. Their monitors are known for technological innovation and enjoy high consumer trust. Budget IPS models offer good value with better color and viewing angles than their TN counterparts. The standard 3-year warranty is backed by an established, official service network in Bangladesh." },
+                { brand: "ASUS", model: "VP229HE", price: 11400, size: 21.5, panel: "IPS", refreshRate: 75, srgb: 99, eyecare: 4, build: 4, value: 7, gaming: 3, overall: 8, desc: "A balanced monitor with a focus on certified Eye Care technology for user comfort.", analysis: "ASUS is highly respected for performance and robust build quality. Their monitors often feature excellent, TÜV Rheinland-certified Eye Care technology, making them ideal for users who spend long hours at the screen. The brand's reputation for durability, combined with a 3-year warranty and official service infrastructure, makes them a strong contender." },
+                { brand: "ASUS", model: "VY229HF", price: 12500, size: 21.45, panel: "IPS", refreshRate: 100, srgb: 99, eyecare: 5, build: 4, value: 8, gaming: 7, overall: 9, desc: "Excellent all-rounder with 100Hz refresh rate and top-tier eye comfort features.", analysis: "ASUS is highly respected for performance and robust build quality. Their monitors often feature excellent, TÜV Rheinland-certified Eye Care technology, making them ideal for users who spend long hours at the screen. The brand's reputation for durability, combined with a 3-year warranty and official service infrastructure, makes them a strong contender." },
+                { brand: "ViewSonic", model: "VA220-H", price: 9650, size: 22, panel: "VA", refreshRate: 100, srgb: 104, eyecare: 3, build: 3, value: 9, gaming: 6, overall: 8, desc: "Provides superior contrast and 100Hz refresh rate at a highly competitive price point.", analysis: "ViewSonic is a dedicated display technology brand perceived as offering strong value for money. They stand out with competitive specs (like 100Hz and high sRGB coverage) and a global commitment to repairability and long-term spare part availability, a strong indicator for longevity. They have established service partners in Bangladesh." },
+                { brand: "ViewSonic", model: "VA2209-H-2", price: 10500, size: 22, panel: "IPS", refreshRate: 100, srgb: 104, eyecare: 3, build: 4, value: 10, gaming: 7, overall: 10, desc: "Excellent color, 100Hz refresh rate, and wide viewing angles. A top value proposition.", analysis: "ViewSonic is a dedicated display technology brand perceived as offering strong value for money. They stand out with competitive specs (like 100Hz and high sRGB coverage) and a global commitment to repairability and long-term spare part availability, a strong indicator for longevity. They have established service partners in Bangladesh." },
+                { brand: "MSI", model: "PRO MP223 E2", price: 9100, size: 21.45, panel: "VA", refreshRate: 100, srgb: 99, eyecare: 3, build: 3, value: 9, gaming: 5, overall: 8, desc: "High-contrast VA panel with 100Hz refresh rate, great for productivity and media.", analysis: "MSI is esteemed in the PC gaming community and brings that performance focus to its PRO series monitors. They offer excellent features like 100Hz refresh rates at budget-friendly prices. The choice between high-contrast VA and color-rich IPS panels is a key advantage. Reputability hinges on their local after-sales service effectiveness." },
+                { brand: "MSI", model: "PRO MP225", price: 11200, size: 21.5, panel: "IPS", refreshRate: 100, srgb: 107, eyecare: 4, build: 4, value: 9, gaming: 7, overall: 9, desc: "Fantastic color coverage (107% sRGB) and a smooth 100Hz refresh rate. Excellent value.", analysis: "MSI is esteemed in the PC gaming community and brings that performance focus to its PRO series monitors. They offer excellent features like 100Hz refresh rates at budget-friendly prices. The choice between high-contrast VA and color-rich IPS panels is a key advantage. Reputability hinges on their local after-sales service effectiveness." },
+                { brand: "Hikvision", model: "DS-D5022F2-2P2", price: 8900, size: 21.45, panel: "IPS", refreshRate: 100, srgb: 99, eyecare: 2, build: 3, value: 8, gaming: 5, overall: 7, desc: "Offers an impressive 100Hz IPS panel at a very low price, though display tuning may favor clarity over vibrancy.", analysis: "Hikvision's entry into consumer monitors leverages its manufacturing scale from the security industry. This allows them to offer impressive on-paper specs (100Hz, IPS) at aggressive prices. The build may be robust due to their background, but display tuning may prioritize clarity for security over nuanced colors for media. Consumer service effectiveness is a key consideration." },
+                { brand: "Dahua", model: "DHI-LM22-C201P", price: 9750, size: 21.5, panel: "IPS", refreshRate: 100, srgb: 100, eyecare: 3, build: 3, value: 10, gaming: 6, overall: 9, desc: "Amazing value with 100Hz, IPS panel, and 100% sRGB coverage at a low price.", analysis: "Similar to Hikvision, Dahua is a major surveillance company offering spec-rich monitors. They often feature excellent color gamut coverage for the price and provide a dedicated service hotline in Bangladesh. Their long-term reputability will depend on whether the consumer experience and service match that of established display brands." },
+                { brand: "BenQ", model: "GW2283", price: 11700, size: 21.5, panel: "IPS", refreshRate: 60, srgb: 99, eyecare: 5, build: 4, value: 6, gaming: 1, overall: 7, desc: "The top choice for eye comfort, featuring advanced, certified Eye-Care technologies.", analysis: "BenQ is highly regarded for build quality, reliability, and especially its industry-leading Eye-Care technology. The GW2283's Brightness Intelligence automatically adjusts to your environment to reduce eye strain. For users prioritizing viewing comfort and eye health over high refresh rates, BenQ is a top-tier, reputable choice." },
+                { brand: "HP", model: "M22f", price: 13200, size: 21.5, panel: "IPS", refreshRate: 75, srgb: 99, eyecare: 4, build: 3, value: 7, gaming: 3, overall: 8, desc: "A sleek IPS monitor with great color accuracy and high brightness for the price.", analysis: "HP is a reliable mainstream brand. Their budget monitors show a clear value progression, with IPS models like the M22f offering excellent display quality (99% sRGB, 300 nits brightness) and certified eye comfort features. A standard 3-year warranty provides a good safety net, with overall reputability depending on local service quality." },
+            ];
+
+            const state = {
+                priority: 'overall',
+                maxPrice: 15000,
+                selectedBrands: [],
+                chartMetric: 'price',
+                sortKey: 'price',
+                sortOrder: 'asc',
+            };
+
+            const brandFilterEl = document.getElementById('brand-filter');
+            const prioritySelectorEl = document.getElementById('priority-selector');
+            const priceSliderEl = document.getElementById('price-slider');
+            const priceValueEl = document.getElementById('price-value');
+            const recommendationsContainerEl = document.getElementById('recommendations-container');
+            const tableBodyEl = document.getElementById('monitors-table-body');
+            const brandDetailsSectionEl = document.getElementById('brand-details-section');
+            const chartMetricSelectorEl = document.getElementById('chart-metric-selector');
+            const tableHeadersEl = document.querySelectorAll('#details thead th');
+
+            let chartInstance = null;
+            
+            function getUniqueBrands() {
+                const brandSet = new Set(monitors.map(m => m.brand));
+                return Array.from(brandSet).sort();
+            }
+
+            function setupBrandFilters() {
+                const brands = getUniqueBrands();
+                state.selectedBrands = [...brands];
+                brandFilterEl.innerHTML = brands.map(brand => `
+                    <label class="inline-flex items-center">
+                        <input type="checkbox" class="form-checkbox h-5 w-5 rounded text-blue-600" data-brand="${brand}" checked>
+                        <span class="ml-2 text-gray-700">${brand}</span>
+                    </label>
+                `).join('');
+            }
+
+            function updateDashboard() {
+                let filteredMonitors = monitors.filter(m => 
+                    m.price <= state.maxPrice && state.selectedBrands.includes(m.brand)
+                );
+
+                const scoreKey = state.priority;
+                filteredMonitors.sort((a, b) => b[scoreKey] - a[scoreKey]);
+
+                renderRecommendations(filteredMonitors.slice(0, 3));
+                
+                const tableSortedMonitors = [...filteredMonitors].sort((a, b) => {
+                    let valA = a[state.sortKey];
+                    let valB = b[state.sortKey];
+                    if (typeof valA === 'string') {
+                        return state.sortOrder === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
+                    }
+                    return state.sortOrder === 'asc' ? valA - valB : valB - valA;
+                });
+                renderTable(tableSortedMonitors);
+
+                renderChart(filteredMonitors);
+            }
+            
+            function renderRecommendations(recommended) {
+                if (recommended.length === 0) {
+                    recommendationsContainerEl.innerHTML = `<p class="text-gray-500 col-span-full">No monitors match your criteria. Try adjusting your filters.</p>`;
+                    return;
+                }
+                recommendationsContainerEl.innerHTML = recommended.map(m => `
+                    <div class="bg-white p-6 rounded-2xl shadow-sm border-2 border-transparent hover:border-[#7AA58A] transition-colors duration-300">
+                        <div class="flex justify-between items-start mb-2">
+                             <h3 class="text-lg font-bold">${m.brand} ${m.model}</h3>
+                             <span class="text-lg font-semibold text-[#5F7996]">৳${m.price.toLocaleString('en-IN')}</span>
+                        </div>
+                        <p class="text-gray-600 mb-4 text-sm">${m.desc}</p>
+                        <div class="flex flex-wrap gap-x-3 gap-y-2 text-xs">
+                            <span class="bg-blue-100 text-blue-800 px-2 py-1 rounded-full">${m.panel} Panel</span>
+                            <span class="bg-green-100 text-green-800 px-2 py-1 rounded-full">${m.refreshRate}Hz</span>
+                            <span class="bg-purple-100 text-purple-800 px-2 py-1 rounded-full">${m.srgb}% sRGB</span>
+                        </div>
+                    </div>
+                `).join('');
+            }
+            
+            function renderTable(data) {
+                if (data.length === 0) {
+                    tableBodyEl.innerHTML = `<tr><td colspan="8" class="text-center py-8 text-gray-500">No monitors match your criteria.</td></tr>`;
+                    return;
+                }
+                tableBodyEl.innerHTML = data.map(m => `
+                    <tr class="bg-white border-b hover:bg-gray-50">
+                        <td class="px-6 py-4 font-medium text-gray-900 whitespace-nowrap">
+                            <a href="#" class="brand-link hover:underline text-[#5F7996]" data-brand="${m.brand}">${m.brand}</a>
+                        </td>
+                        <td class="px-6 py-4">${m.model}</td>
+                        <td class="px-6 py-4">৳${m.price.toLocaleString('en-IN')}</td>
+                        <td class="px-6 py-4">${m.size}"</td>
+                        <td class="px-6 py-4">${m.panel}</td>
+                        <td class="px-6 py-4 font-semibold">${m.refreshRate}</td>
+                        <td class="px-6 py-4">${m.srgb}</td>
+                        <td class="px-6 py-4 font-bold text-lg text-green-600">${m[state.priority]}</td>
+                    </tr>
+                `).join('');
+            }
+
+            function renderChart(data) {
+                const ctx = document.getElementById('monitorsChart').getContext('2d');
+                
+                const sortedData = [...data].sort((a,b) => {
+                    if (state.chartMetric === 'price') return a[state.chartMetric] - b[state.chartMetric];
+                    return b[state.chartMetric] - a[state.chartMetric];
+                }).slice(0, 15);
+
+                const chartLabels = sortedData.map(m => `${m.brand} ${m.model}`);
+                const chartData = sortedData.map(m => m[state.chartMetric]);
+                
+                let metricLabel = state.chartMetric.charAt(0).toUpperCase() + state.chartMetric.slice(1);
+                if(state.chartMetric === 'price') metricLabel = 'Price (BDT)';
+                if(state.chartMetric === 'srgb') metricLabel = 'sRGB Coverage (%)';
+                if(state.chartMetric === 'refreshRate') metricLabel = 'Refresh Rate (Hz)';
+
+
+                if (chartInstance) {
+                    chartInstance.destroy();
+                }
+
+                chartInstance = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: chartLabels,
+                        datasets: [{
+                            label: metricLabel,
+                            data: chartData,
+                            backgroundColor: '#7AA58A',
+                            borderColor: '#5c856c',
+                            borderWidth: 1,
+                            borderRadius: 4
+                        }]
+                    },
+                    options: {
+                        indexAxis: 'y',
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        let label = context.dataset.label || '';
+                                        if (label) {
+                                            label += ': ';
+                                        }
+                                        if (context.parsed.x !== null) {
+                                             if (state.chartMetric === 'price') {
+                                                label += `৳${context.parsed.x.toLocaleString('en-IN')}`;
+                                            } else {
+                                                label += context.parsed.x;
+                                            }
+                                        }
+                                        return label;
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            x: {
+                                beginAtZero: false,
+                                title: { display: true, text: metricLabel }
+                            },
+                            y: {
+                                ticks: {
+                                    autoSkip: false,
+                                    callback: function(value, index, values) {
+                                        const label = this.getLabelForValue(value);
+                                        return label.length > 20 ? label.substring(0, 20) + '...' : label;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+            
+            function renderBrandDetails(brand) {
+                const brandData = monitors.find(m => m.brand === brand);
+                if (!brandData) return;
+
+                const existingCard = document.querySelector(`.brand-card[data-brand="${brand}"]`);
+                if (existingCard) {
+                    const detailsEl = existingCard.querySelector('.brand-details');
+                    detailsEl.classList.toggle('open');
+                    return;
+                }
+
+                const cardHTML = `
+                    <div class="brand-card bg-white p-6 rounded-2xl shadow-lg mt-4" data-brand="${brand}" style="opacity: 0; transform: translateY(20px);">
+                        <div class="flex justify-between items-center">
+                            <h3 class="text-2xl font-bold">${brand} - Detailed Analysis</h3>
+                             <button class="close-brand-details text-2xl text-gray-500 hover:text-gray-800">&times;</button>
+                        </div>
+                        <div class="brand-details open mt-4 prose max-w-none text-gray-700">
+                           <p>${brandData.analysis}</p>
+                        </div>
+                    </div>
+                `;
+                brandDetailsSectionEl.innerHTML = cardHTML;
+
+                setTimeout(() => {
+                    const newCard = brandDetailsSectionEl.querySelector('.brand-card');
+                    if (newCard) {
+                        newCard.style.opacity = '1';
+                        newCard.style.transform = 'translateY(0)';
+                    }
+                }, 50);
+            }
+
+            prioritySelectorEl.addEventListener('click', (e) => {
+                if (e.target.tagName === 'BUTTON') {
+                    state.priority = e.target.dataset.priority;
+                    prioritySelectorEl.querySelectorAll('button').forEach(btn => btn.classList.remove('active'));
+                    e.target.classList.add('active');
+                    updateDashboard();
+                }
+            });
+
+            priceSliderEl.addEventListener('input', (e) => {
+                state.maxPrice = parseInt(e.target.value, 10);
+                priceValueEl.textContent = state.maxPrice.toLocaleString('en-IN');
+            });
+            priceSliderEl.addEventListener('change', updateDashboard);
+            
+            brandFilterEl.addEventListener('change', (e) => {
+                if(e.target.type === 'checkbox') {
+                    const brand = e.target.dataset.brand;
+                    if(e.target.checked) {
+                        state.selectedBrands.push(brand);
+                    } else {
+                        state.selectedBrands = state.selectedBrands.filter(b => b !== brand);
+                    }
+                    updateDashboard();
+                }
+            });
+            
+            tableBodyEl.addEventListener('click', e => {
+                if (e.target.classList.contains('brand-link')) {
+                    e.preventDefault();
+                    const brand = e.target.dataset.brand;
+                    renderBrandDetails(brand);
+                }
+            });
+            
+            brandDetailsSectionEl.addEventListener('click', e => {
+                if (e.target.classList.contains('close-brand-details')) {
+                    brandDetailsSectionEl.innerHTML = '';
+                }
+            });
+
+            chartMetricSelectorEl.addEventListener('change', e => {
+                state.chartMetric = e.target.value;
+                updateDashboard();
+            });
+
+            tableHeadersEl.forEach(th => {
+                th.addEventListener('click', () => {
+                    const key = th.dataset.sort;
+                    if(state.sortKey === key) {
+                        state.sortOrder = state.sortOrder === 'asc' ? 'desc' : 'asc';
+                    } else {
+                        state.sortKey = key;
+                        state.sortOrder = 'asc';
+                    }
+                    updateDashboard();
+                });
+            });
+
+            function init() {
+                setupBrandFilters();
+                updateDashboard();
+            }
+
+            init();
+        });
+    </script>
+
+</body>
+</html>
